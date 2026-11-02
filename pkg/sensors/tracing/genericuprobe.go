@@ -585,9 +585,22 @@ type uprobeArgConfig struct {
 	preload        bool
 }
 
+var uprobeCapabilities = SensorCapabilities{
+	Name:                         "uprobe",
+	AllowMatchReturnArgs:         true,
+	DisallowKernelStackTrace:     true,
+	RequirePostForUserStackTrace: true,
+	DisallowedActions: map[string]string{
+		"notifyenforcer":              "enforcer actions are not supported for uprobes",
+		"cleanupenforcernotification": "enforcer actions are not supported for uprobes",
+		"geturl":                      "failed to configure uprobe, GetUrl and DnsLookup actions not supported",
+		"dnslookup":                   "failed to configure uprobe, GetUrl and DnsLookup actions not supported",
+	},
+}
+
 func validateUprobeSpec(spec *v1alpha1.UProbeSpec, state *uprobeConfigState) error {
-	if selectors.HasEnforcerAction(spec.Selectors) {
-		return errors.New("enforcer actions are not supported for uprobes")
+	if err := validateSensorSelectors(uprobeCapabilities, spec.Selectors, nil); err != nil {
+		return err
 	}
 
 	state.symbols = len(spec.Symbols)
@@ -630,26 +643,7 @@ func validateUprobeSpec(spec *v1alpha1.UProbeSpec, state *uprobeConfigState) err
 		return errors.New("only a single uprobe symbol can be redirected")
 	}
 
-	if selectors.HasGetUrlOrDnsLookup(spec.Selectors) {
-		return errors.New("failed to configure uprobe, GetUrl and DnsLookup actions not supported")
-	}
 
-	for sid, s := range spec.Selectors {
-		for mid, action := range s.MatchActions {
-			if action.KernelStackTrace {
-				return fmt.Errorf("kernelStackTrace is not supported for uprobes: got kernelStackTrace enabled in selectors[%d].matchActions[%d]", sid, mid)
-			}
-			if action.UserStackTrace && action.Action != "Post" {
-				return fmt.Errorf("userStackTrace can only be used along Post action: got userStackTrace enabled in selectors[%d].matchActions[%d] with action '%s'", sid, mid, action.Action)
-			}
-			if action.Action != "Set" {
-				continue
-			}
-			if action.ArgIndex >= selectors.ArgsInRegisters {
-				return fmt.Errorf("uprobe Set action argIndex %d out of range", action.ArgIndex)
-			}
-		}
-	}
 
 	// validate that `sopath` is correctly set to a regular file
 	if err := ValidateSODynamic(spec); err != nil {

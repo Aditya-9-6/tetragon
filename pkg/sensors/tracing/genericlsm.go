@@ -196,31 +196,22 @@ func handleGenericLsm(r *bytes.Reader) ([]observer.Event, error) {
 	return []observer.Event{unix}, err
 }
 
+var lsmCapabilities = SensorCapabilities{
+	Name:                 "lsm",
+	AllowMatchReturnArgs: false,
+	DisallowStackTrace:   true,
+	SupportedActions: map[string]struct{}{
+		"sigkill":     {},
+		"signal":      {},
+		"nopost":      {},
+		"override":    {},
+		"updatestate": {},
+		"post":        {},
+	},
+}
+
 func isValidLsmSelectors(selectors []v1alpha1.KProbeSelector) error {
-	for _, s := range selectors {
-		if len(s.MatchReturnArgs) > 0 {
-			return errors.New("MatchReturnArgs selector is not supported")
-		}
-		if len(s.MatchActions) > 0 {
-			for _, a := range s.MatchActions {
-				switch strings.ToLower(a.Action) {
-				case "sigkill":
-				case "signal":
-				case "nopost":
-				case "override":
-				case "updatestate":
-					continue
-				case "post":
-					if a.KernelStackTrace || a.UserStackTrace {
-						return errors.New("stacktrace actions are not supported")
-					}
-				default:
-					return fmt.Errorf("%s action is not supported", a.Action)
-				}
-			}
-		}
-	}
-	return nil
+	return validateSensorSelectors(lsmCapabilities, selectors, nil)
 }
 
 func validateLsmArg(j int, a *v1alpha1.KProbeArg) error {

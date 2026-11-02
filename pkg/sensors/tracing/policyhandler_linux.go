@@ -281,9 +281,19 @@ func (h policyHandler) PolicyHandler(
 		return createGenericLsmSensor(spec, "generic_lsm", polInfo)
 	}
 	if len(spec.UProbes) > 0 {
+		for i, up := range spec.UProbes {
+			if err := validateSensorSelectors(uprobeCapabilities, up.Selectors, spec.Enforcers); err != nil {
+				return nil, fmt.Errorf("error in spec.uprobes[%d]: %w", i, err)
+			}
+		}
 		return createGenericUprobeSensor(spec, "generic_uprobe", polInfo)
 	}
 	if len(spec.Usdts) > 0 {
+		for i, usdt := range spec.Usdts {
+			if err := validateSensorSelectors(usdtCapabilities, usdt.Selectors, spec.Enforcers); err != nil {
+				return nil, fmt.Errorf("error in spec.usdts[%d]: failed to configure usdt '%s/%s', %w", i, usdt.Provider, usdt.Name, err)
+			}
+		}
 		return createGenericUsdtSensor(spec, "generic_usdt", polInfo)
 	}
 	return nil, nil

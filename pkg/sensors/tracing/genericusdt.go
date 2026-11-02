@@ -388,6 +388,17 @@ func createUsdtSensorFromEntry(polInfo *policyInfo, usdtEntry *genericUsdt,
 	return progs, maps
 }
 
+var usdtCapabilities = SensorCapabilities{
+	Name:                 "usdt",
+	AllowMatchReturnArgs: true,
+	DisallowedActions: map[string]string{
+		"notifyenforcer":              "enforcer actions are not supported",
+		"cleanupenforcernotification": "enforcer actions are not supported",
+		"geturl":                      "GetUrl and DnsLookup actions not supported",
+		"dnslookup":                   "GetUrl and DnsLookup actions not supported",
+	},
+}
+
 func addUsdt(spec *v1alpha1.UsdtSpec, in *addUsdtIn, ids []idtable.EntryID, has *usdtHas) (retIDs []idtable.EntryID, retErr error) {
 	var state *selectors.KernelSelectorState
 
@@ -422,12 +433,8 @@ func addUsdt(spec *v1alpha1.UsdtSpec, in *addUsdtIn, ids []idtable.EntryID, has 
 			"policy-name", in.policyName)
 	}
 
-	if selectors.HasGetUrlOrDnsLookup(spec.Selectors) {
-		return ids, fmt.Errorf("failed to configure usdt '%s/%s', GetUrl and DnsLookup actions not supported", spec.Provider, spec.Name)
-	}
-
-	if selectors.HasEnforcerAction(spec.Selectors) {
-		return ids, fmt.Errorf("failed to configure usdt '%s/%s', enforcer actions are not supported", spec.Provider, spec.Name)
+	if err := validateSensorSelectors(usdtCapabilities, spec.Selectors, nil); err != nil {
+		return ids, fmt.Errorf("failed to configure usdt '%s/%s', %w", spec.Provider, spec.Name, err)
 	}
 
 	// Parse Filters into kernel filter logic

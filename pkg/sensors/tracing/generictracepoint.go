@@ -429,14 +429,20 @@ func preValidateTracepoint(spec *v1alpha1.TracepointSpec) (*tpValidateInfo, erro
 	return &tpValidateInfo{tp: tpInfo}, nil
 }
 
+var tracepointCapabilities = SensorCapabilities{
+	Name:                      "tracepoint",
+	AllowMatchReturnArgs:      true,
+	RequireEnforcersForNotify: true,
+}
+
 // preValidateTracepoints pre-validates the semantics of tracepoint specs.
 // It checks that each tracepoint subsystem/event exists and that arguments
 // are valid. It also validates that NotifyEnforcer actions have enforcers.
 func preValidateTracepoints(tracepoints []v1alpha1.TracepointSpec, enforcers []v1alpha1.EnforcerSpec) ([]*tpValidateInfo, error) {
 	ret := make([]*tpValidateInfo, len(tracepoints))
 	for i := range tracepoints {
-		if selectors.HasNotifyEnforcerAction(tracepoints[i].Selectors) && len(enforcers) == 0 {
-			return nil, fmt.Errorf("error in spec.tracepoints[%d]: NotifyEnforcer action specified, but spec contains no enforcers", i)
+		if err := validateSensorSelectors(tracepointCapabilities, tracepoints[i].Selectors, enforcers); err != nil {
+			return nil, fmt.Errorf("error in spec.tracepoints[%d]: %w", i, err)
 		}
 
 		var err error

@@ -447,6 +447,12 @@ func preValidateKprobe(
 	}, nil
 }
 
+var kprobeCapabilities = SensorCapabilities{
+	Name:                      "kprobe",
+	AllowMatchReturnArgs:      true,
+	RequireEnforcersForNotify: true,
+}
+
 // preValidateKprobes pre-validates the semantics and BTF information of a Kprobe spec
 // Furthermore, it does some preprocessing of the calls and returns one kpValidateInfo struct per
 // kprobe. It also validates that if any selector uses NotifyEnforcer action, the spec contains enforcers.
@@ -468,12 +474,10 @@ func preValidateKprobes(log logger.FieldLogger, kprobes []v1alpha1.KProbeSpec, l
 		return nil, fmt.Errorf("validateKprobeSpec: ksyms.KernelSymbols: %w", err)
 	}
 
-	// If the NotifyEnforcer action is specified, there must be at least one enforcer.
+	// Validate selectors and actions against kprobe capabilities.
 	for _, kprobe := range kprobes {
-		if selectors.HasNotifyEnforcerAction(kprobe.Selectors) {
-			if len(enforcers) == 0 {
-				return nil, errors.New("NotifyEnforcer action specified, but spec contains no enforcers")
-			}
+		if err := validateSensorSelectors(kprobeCapabilities, kprobe.Selectors, enforcers); err != nil {
+			return nil, err
 		}
 	}
 
